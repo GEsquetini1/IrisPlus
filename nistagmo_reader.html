@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Leitor para Nistagmo — Simulador e Ajustes</title>
+  <style>
+    :root{
+      --bg:#f7f7f9; --panel:#ffffff; --accent:#0b63d6; --text:#111;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;color:var(--text);background:linear-gradient(180deg,var(--bg),#e9eefb);}
+    .app{display:grid;grid-template-columns:380px 1fr;gap:20px;padding:20px;height:100vh}
+    .panel{background:var(--panel);border-radius:12px;padding:18px;box-shadow:0 6px 20px rgba(10,20,40,0.08);overflow:auto}
+
+    .header{display:flex;align-items:center;gap:12px}
+    .brand{font-weight:700;font-size:18px}
+    .controls h3{margin:6px 0 12px;font-size:15px}
+    label{display:block;font-size:13px;margin:6px 0;color:#334}
+    .row{display:flex;gap:8px;align-items:center}
+    input[type=range]{width:100%}
+    input[type=number]{width:90px;padding:6px;border-radius:6px;border:1px solid #d6dbe8}
+    select{padding:8px;border-radius:8px;border:1px solid #d6dbe8}
+    button{background:var(--accent);color:#fff;padding:10px 12px;border:none;border-radius:8px;cursor:pointer}
+    .secondary{background:#e8eefc;color:var(--accent);border:1px solid rgba(11,99,214,0.12)}
+
+    /* Reading area */
+    .reader-wrap{display:flex;flex-direction:column;height:100%;}
+    .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+    .viewport{flex:1;display:flex;align-items:center;justify-content:center;padding:28px}
+    .reading-box{width:min(80ch,900px);max-width:95%;background:rgba(255,255,255,0.95);border-radius:10px;padding:26px;box-shadow:0 8px 30px rgba(10,20,40,0.06);overflow:hidden;position:relative}
+
+    .inner-text{font-size:20px;line-height:1.6;color:#0b1b2a}
+    .controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .small{font-size:13px;padding:6px}
+
+    /* focus box */
+    .focus-box{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:60%;height:30%;border:2px dashed rgba(11,99,214,0.18);pointer-events:none;border-radius:8px}
+
+    /* reduced-motion safe */
+    @media (prefers-reduced-motion: reduce){
+      .reading-box, .inner-text{transition:none!important}
+    }
+
+    /* responsive */
+    @media(max-width:900px){.app{grid-template-columns:1fr;grid-auto-rows:auto}.panel{order:2}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="panel controls" aria-label="Controles de leitura">
+      <div class="header"><div class="brand">Leitor Nistagmo</div><div style="margin-left:auto;font-size:12px;color:#556">v1.0</div></div>
+
+      <h3>Ajustes de movimento</h3>
+      <label>Frequência (Hz) <span id="freqLabel">1.5</span></label>
+      <input type="range" id="freq" min="0" max="8" step="0.1" value="1.5" />
+
+      <label>Amplitude (px) <span id="ampLabel">20</span></label>
+      <input type="range" id="amp" min="0" max="120" step="1" value="20" />
+
+      <label>Ângulo (graus) <span id="angleLabel">0</span></label>
+      <input type="range" id="angle" min="-45" max="45" step="1" value="0" />
+
+      <label>Tipo de movimento</label>
+      <select id="mode">
+        <option value="horizontal">Horizontal</option>
+        <option value="vertical">Vertical</option>
+        <option value="rotational">Rotacional (oscilar)</option>
+        <option value="diagonal">Diagonal</option>
+        <option value="random">Aleatório (ruído)</option>
+      </select>
+
+      <h3 style="margin-top:16px">Acessibilidade</h3>
+      <label>Tamanho da fonte <span id="fontLabel">20</span>px</label>
+      <input type="range" id="fontSize" min="12" max="40" step="1" value="20" />
+
+      <label>Espaçamento de linhas <span id="lhLabel">1.6</span></label>
+      <input type="range" id="lineHeight" min="1" max="2.4" step="0.1" value="1.6" />
+
+      <label>Contraste / Tema</label>
+      <select id="theme">
+        <option value="light">Claro</option>
+        <option value="high">Alto contraste (fundo escuro)</option>
+        <option value="sepia">Sépio</option>
+      </select>
+
+      <div style="margin-top:12px" class="row">
+        <button id="play">Iniciar</button>
+        <button id="pause" class="secondary">Pausar</button>
+      </div>
+
+      <div style="margin-top:12px" class="row">
+        <button id="stabilize" class="small secondary">Estabilizar (reduzir movimento)</button>
+        <button id="focusToggle" class="small">Mostrar foco</button>
+      </div>
+
+      <h3 style="margin-top:16px">Configurações avançadas</h3>
+      <label>Fator de suavidade (0–1)</label>
+      <input type="range" id="smooth" min="0" max="1" step="0.05" value="0.15" />
+
+      <label>Ruído aleatório</label>
+      <input type="range" id="noise" min="0" max="1" step="0.01" value="0.03" />
+
+      <p style="font-size:13px;color:#445;margin-top:12px">Dicas: ajuste frequência/amplitude até encontrar um padrão que o paciente consiga acompanhar com os olhos. Use alto contraste e fonte maior para facilitar.</p>
+
+    </aside>
+
+    <main class="reader-wrap">
+      <div class="panel toolbar" role="toolbar" aria-label="Barra de ferramentas de leitura">
+        <div style="font-weight:600">Área de leitura</div>
+        <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+          <label class="small">Pesquisar texto</label>
+          <input id="textInput" placeholder="Cole ou digite texto aqui" style="padding:8px;border-radius:8px;border:1px solid #d6dbe8;width:380px" />
+          <button id="loadText" class="small">Carregar</button>
+        </div>
+      </div>
+
+      <div class="viewport">
+        <div class="reading-box" id="readingBox" aria-live="polite">
+          <div class="focus-box" id="focusBox" hidden></div>
+          <div id="inner" class="inner-text" role="article" tabindex="0">
+            <p>Exemplo: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed pretium, nunc eu vulputate luctus, nisl lectus sodales mi, at euismod leo dui in justo. Praesent feugiat, nisl in luctus gravida, purus sapien gravida arcu, at tristique sapien augue eget risus. Aproxime o texto do leitor para testar diferentes amplitudes e frequências — esse texto é apenas de exemplo. Ajuste tamanho da fonte, espaçamento e contraste para melhorar a leitura.</p>
+            <p>Linhas curtas e espaçamento maior ajudam. Tente alternar entre movimentos horizontais e rotacionais. Essa ferramenta é um protótipo e deve ser usada com orientação profissional.</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // Element refs
+    const freq = document.getElementById('freq');
+    const amp = document.getElementById('amp');
+    const angle = document.getElementById('angle');
+    const mode = document.getElementById('mode');
+    const play = document.getElementById('play');
+    const pause = document.getElementById('pause');
+    const inner = document.getElementById('inner');
+    const readingBox = document.getElementById('readingBox');
+    const stabilize = document.getElementById('stabilize');
+    const focusToggle = document.getElementById('focusToggle');
+    const focusBox = document.getElementById('focusBox');
+    const fontSize = document.getElementById('fontSize');
+    const lineHeight = document.getElementById('lineHeight');
+    const theme = document.getElementById('theme');
+    const smooth = document.getElementById('smooth');
+    const noise = document.getElementById('noise');
+
+    const freqLabel = document.getElementById('freqLabel');
+    const ampLabel = document.getElementById('ampLabel');
+    const angleLabel = document.getElementById('angleLabel');
+    const fontLabel = document.getElementById('fontLabel');
+    const lhLabel = document.getElementById('lhLabel');
+
+    // Text loading
+    document.getElementById('loadText').addEventListener('click', ()=>{
+      const v = document.getElementById('textInput').value.trim();
+      if(v) inner.innerHTML = '<p>'+v.replace(/\n/g,'</p><p>')+'</p>';
+      inner.focus();
+    });
+
+    // Labels update
+    freq.addEventListener('input', ()=>freqLabel.textContent = freq.value);
+    amp.addEventListener('input', ()=>ampLabel.textContent = amp.value);
+    angle.addEventListener('input', ()=>angleLabel.textContent = angle.value);
+    fontSize.addEventListener('input', ()=>{fontLabel.textContent=fontSize.value; inner.style.fontSize = fontSize.value+'px'});
+    lineHeight.addEventListener('input', ()=>{lhLabel.textContent=lineHeight.value; inner.style.lineHeight = lineHeight.value});
+
+    theme.addEventListener('change', ()=>{
+      if(theme.value==='high'){
+        document.documentElement.style.setProperty('--bg','#0b1220');
+        document.documentElement.style.setProperty('--panel','#041124');
+        inner.style.color='#fff';
+        inner.style.background='none';
+      } else if(theme.value==='sepia'){
+        document.documentElement.style.setProperty('--bg','#f3ead6');
+        document.documentElement.style.setProperty('--panel','#fff6e6');
+        inner.style.color='#2b1f0d';
+      } else {
+        document.documentElement.style.setProperty('--bg','#f7f7f9');
+        document.documentElement.style.setProperty('--panel','#fff');
+        inner.style.color='#0b1b2a';
+      }
+    });
+
+    // Motion state
+    let running = false;
+    let start = null;
+    let lastX=0,lastY=0,lastR=0;
+    let stabilized = false;
+
+    function applyTransform(x,y,r){
+      // smoothing
+      const s = parseFloat(smooth.value);
+      lastX += (x-lastX)*s;
+      lastY += (y-lastY)*s;
+      lastR += (r-lastR)*s;
+      inner.style.transform = `translate(${lastX}px, ${lastY}px) rotate(${lastR}deg)`;
+    }
+
+    function step(timestamp){
+      if(!start) start=timestamp;
+      const t = (timestamp - start)/1000; // seconds
+      const f = parseFloat(freq.value);
+      const A = parseFloat(amp.value);
+      const ang = parseFloat(angle.value);
+      const m = mode.value;
+      const n = parseFloat(noise.value);
+
+      // base oscillation
+      let x=0,y=0,r=0;
+      const omega = 2*Math.PI*f;
+      if(m==='horizontal') x = Math.sin(omega*t)*A;
+      if(m==='vertical') y = Math.sin(omega*t)*A;
+      if(m==='rotational') r = Math.sin(omega*t)*(ang||15);
+      if(m==='diagonal'){ x = Math.sin(omega*t)*A; y = Math.cos(omega*t)*A*0.6 }
+      if(m==='random') { x = (Math.random()*2-1)*A; y = (Math.random()*2-1)*A; r = (Math.random()*2-1)*(ang||10) }
+
+      // apply angle bias (rotate the vector)
+      if(m!=='rotational'){
+        const rad = ang*Math.PI/180;
+        const cos = Math.cos(rad), sin = Math.sin(rad);
+        const rx = x*cos - y*sin;
+        const ry = x*sin + y*cos;
+        x = rx; y = ry;
+      }
+
+      // add small Perlin-like noise using sin with different frequencies
+      const noiseFactor = n;
+      x += Math.sin(omega*1.7*t + 1.2)*A*noiseFactor;
+      y += Math.sin(omega*2.3*t + 0.7)*A*noiseFactor;
+
+      // stabilization reduces amplitude
+      const stabFactor = stabilized ? 0.25 : 1;
+      x *= stabFactor; y *= stabFactor; r *= stabFactor;
+
+      applyTransform(x,y,r);
+
+      if(running) requestAnimationFrame(step);
+    }
+
+    play.addEventListener('click', ()=>{
+      if(!running){running=true; start=null; requestAnimationFrame(step)}
+    });
+    pause.addEventListener('click', ()=>{running=false; start=null});
+
+    stabilize.addEventListener('click', ()=>{stabilized = !stabilized; stabilize.classList.toggle('secondary',stabilized); stabilize.textContent = stabilized ? 'Estabilizado (ON)' : 'Estabilizar (reduzir movimento)'});
+
+    focusToggle.addEventListener('click', ()=>{const show = focusBox.hidden; focusBox.hidden = !show; focusToggle.textContent = show ? 'Ocultar foco' : 'Mostrar foco'});
+
+    // keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if(e.key===' '){e.preventDefault(); running = !running; if(running) requestAnimationFrame(step)}
+      if(e.key==='s') {stabilized = !stabilized; stabilize.classList.toggle('secondary',stabilized)}
+    });
+
+    // initial UI sync
+    inner.style.fontSize = fontSize.value + 'px';
+    inner.style.lineHeight = lineHeight.value;
+    freqLabel.textContent = freq.value; ampLabel.textContent = amp.value; angleLabel.textContent = angle.value; fontLabel.textContent = fontSize.value; lhLabel.textContent = lineHeight.value;
+
+    // Accessibility: respect prefers-reduced-motion
+    if(window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      // disable animations by default
+      freq.value = 0; amp.value = 0; freqLabel.textContent=0; ampLabel.textContent=0;
+    }
+
+    // small guidance for clinicians
+    console.log('Leitor Nistagmo inicializado — ajuste frequência, amplitude e ângulo para encontrar o melhor padrão de acompanhamento ocular.');
+
+  </script>
+</body>
+</html>

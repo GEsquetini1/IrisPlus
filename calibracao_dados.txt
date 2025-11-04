@@ -1,0 +1,21 @@
+=== DADOS DE CALIBRACAO ===
+Data/Hora: 2025-11-02 04:03:25
+
+PARAMETROS CALIBRADOS:
+a = 5828.544403
+b = -54.281242
+
+DADOS BRUTOS DE CALIBRACAO:
+Distancia 50cm: 62.29 pixels
+Distancia 30cm: 140.00 pixels
+
+FORMULA DE CALCULO:
+distancia_cm = a / (eye_distance_px - b)
+
+VALORES DE REFERENCIA:
+W_real = 6.5 cm
+
+EXEMPLOS:
+150.0 px -> 28.5 cm
+200.0 px -> 22.9 cm
+100.0 px -> 37.8 cm

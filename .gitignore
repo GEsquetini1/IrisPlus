@@ -1,0 +1,17 @@
+# Ignorar ambiente virtual
+mediapipe_iris_env/
+venv/
+.env/
+
+# Ignorar arquivos grandes e dependências
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.dll
+*.so
+*.dylib
+
+# Arquivos temporários
+*.log
+*.tmp
